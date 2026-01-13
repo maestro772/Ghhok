@@ -1,0 +1,326 @@
+1) LeveringModel.cs
+
+Zet dit bestand in je Models map.
+
+using System;
+
+namespace Voedselbank.Models
+{
+    public class LeveringModel
+    {
+        public int LeveringId { get; set; }
+        public int LeverancierId { get; set; }
+        public string LeverancierNaam { get; set; }
+
+        public int ProductId { get; set; }
+        public string ProductNaam { get; set; }
+
+        public int Aantal { get; set; }          // porties/aantal
+        public DateTime LeverDatum { get; set; }
+        public string Notitie { get; set; }
+        public DateTime AangemaaktOp { get; set; }
+    }
+}
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+2) LeveringController.cs
+
+Zet dit bestand in je Controllers map.
+
+using System;
+using System.Collections.Generic;
+using System.Data.SqlClient;
+using Voedselbank.Models;
+
+namespace Voedselbank.Controllers
+{
+    public class LeveringController
+    {
+        private readonly string _connectionString;
+
+        public LeveringController(string connectionString)
+        {
+            _connectionString = connectionString;
+        }
+
+        // Eis 2: Add levering (maakt Levering + LeveringProduct)
+        public bool Add(LeveringModel levering)
+        {
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
+                SqlTransaction tran = conn.BeginTransaction();
+
+                try
+                {
+                    // 1) Insert header: Levering
+                    int newLeveringId;
+
+                    using (SqlCommand cmd = new SqlCommand(@"
+                        INSERT INTO Levering (LeverancierId, LeverDatum, Notitie, AangemaaktOp)
+                        VALUES (@LeverancierId, @LeverDatum, @Notitie, @AangemaaktOp);
+                        SELECT SCOPE_IDENTITY();", conn, tran))
+                    {
+                        cmd.Parameters.AddWithValue("@LeverancierId", levering.LeverancierId);
+                        cmd.Parameters.AddWithValue("@LeverDatum", levering.LeverDatum.Date);
+                        cmd.Parameters.AddWithValue("@Notitie", (object)(levering.Notitie ?? "") ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@AangemaaktOp", DateTime.Now);
+
+                        newLeveringId = Convert.ToInt32(cmd.ExecuteScalar());
+                    }
+
+                    // 2) Insert regel: LeveringProduct
+                    using (SqlCommand cmd2 = new SqlCommand(@"
+                        INSERT INTO LeveringProduct (LeveringId, ProductId, Aantal)
+                        VALUES (@LeveringId, @ProductId, @Aantal);", conn, tran))
+                    {
+                        cmd2.Parameters.AddWithValue("@LeveringId", newLeveringId);
+                        cmd2.Parameters.AddWithValue("@ProductId", levering.ProductId);
+                        cmd2.Parameters.AddWithValue("@Aantal", levering.Aantal);
+
+                        cmd2.ExecuteNonQuery();
+                    }
+
+                    tran.Commit();
+                    return true;
+                }
+                catch
+                {
+                    tran.Rollback();
+                    return false;
+                }
+            }
+        }
+
+        // Eis 2: lijst onderin (controle)
+        public List<LeveringModel> GetAll()
+        {
+            var list = new List<LeveringModel>();
+
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            using (SqlCommand cmd = new SqlCommand(@"
+                SELECT 
+                    l.LeveringId,
+                    l.LeverancierId,
+                    lev.LeverancierNaam,
+                    l.LeverDatum,
+                    l.Notitie,
+                    l.AangemaaktOp,
+                    lp.ProductId,
+                    p.ProductNaam,
+                    lp.Aantal
+                FROM Levering l
+                INNER JOIN Leverancier lev ON lev.LeverancierId = l.LeverancierId
+                INNER JOIN LeveringProduct lp ON lp.LeveringId = l.LeveringId
+                INNER JOIN Product p ON p.ProductId = lp.ProductId
+                ORDER BY l.LeverDatum DESC, l.LeveringId DESC;", conn))
+            {
+                conn.Open();
+                using (SqlDataReader r = cmd.ExecuteReader())
+                {
+                    while (r.Read())
+                    {
+                        list.Add(new LeveringModel
+                        {
+                            LeveringId = Convert.ToInt32(r["LeveringId"]),
+                            LeverancierId = Convert.ToInt32(r["LeverancierId"]),
+                            LeverancierNaam = r["LeverancierNaam"].ToString(),
+                            LeverDatum = Convert.ToDateTime(r["LeverDatum"]),
+                            Notitie = r["Notitie"]?.ToString(),
+                            AangemaaktOp = Convert.ToDateTime(r["AangemaaktOp"]),
+                            ProductId = Convert.ToInt32(r["ProductId"]),
+                            ProductNaam = r["ProductNaam"].ToString(),
+                            Aantal = Convert.ToInt32(r["Aantal"])
+                        });
+                    }
+                }
+            }
+
+            return list;
+        }
+    }
+}
+
+
+Als jouw tabelnaam Leverancier anders heet (bv. Leveranciers) pas alleen die naam aan in de JOIN.
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+3) frmLevering.cs (Overzicht + invoer)
+
+Dit is de code-behind voor je frmLevering (dezelfde stijl als je voorbeeld).
+
+Designer control-namen (maak ze zo)
+
+Bovenin invoer:
+
+ComboBox: cbLeverancier
+
+ComboBox: cbProduct
+
+NumericUpDown: nudAantal
+
+DateTimePicker: dtpLeverDatum
+
+TextBox (optioneel): txtNotitie
+
+Button: btnOpslaanLevering
+
+Onderin:
+
+ListView: lvLeveringen
+
+Links navigatie buttons (zoals jouw schets):
+
+btnProducten, btnLeveranciers, btnLeveringen, btnGrafiek
+
+using System;
+using System.Collections.Generic;
+using System.Configuration;
+using System.Windows.Forms;
+using Voedselbank.Controllers;
+using Voedselbank.Models;
+using Voedselbank.Model; // LeverancierModel namespace (bij jou)
+
+namespace Voedselbankk.View
+{
+    public partial class frmLevering : Form
+    {
+        private readonly LeveringController leveringController;
+        private readonly ProductController productController;
+        private readonly LeverancierController leverancierController;
+
+        public frmLevering()
+        {
+            InitializeComponent();
+
+            string connStr = ConfigurationManager.ConnectionStrings["VoedselbankDB"].ConnectionString;
+
+            leveringController = new LeveringController(connStr);
+            productController = new ProductController(connStr);
+            leverancierController = new LeverancierController(connStr);
+        }
+
+        private void frmLevering_Load(object sender, EventArgs e)
+        {
+            // ListView setup
+            lvLeveringen.Columns.Clear();
+            lvLeveringen.Columns.Add("LeveringId", 80);
+            lvLeveringen.Columns.Add("Datum", 90);
+            lvLeveringen.Columns.Add("Leverancier", 160);
+            lvLeveringen.Columns.Add("Product", 180);
+            lvLeveringen.Columns.Add("Aantal", 70);
+            lvLeveringen.Columns.Add("Notitie", 220);
+
+            lvLeveringen.FullRowSelect = true;
+            lvLeveringen.View = View.Details;
+
+            // Combo's vullen
+            LoadCombos();
+
+            // lijst laden
+            LoadLeveringen();
+
+            // datum default
+            dtpLeverDatum.Value = DateTime.Today;
+        }
+
+        private void LoadCombos()
+        {
+            // Leveranciers
+            var leveranciers = leverancierController.GetAll();
+            cbLeverancier.DataSource = leveranciers;
+            cbLeverancier.DisplayMember = "LeverancierNaam";
+            cbLeverancier.ValueMember = "LeverancierId";
+            cbLeverancier.SelectedIndex = leveranciers.Count > 0 ? 0 : -1;
+
+            // Producten
+            var producten = productController.GetAll();
+            cbProduct.DataSource = producten;
+            cbProduct.DisplayMember = "ProductNaam";
+            cbProduct.ValueMember = "ProductId";
+            cbProduct.SelectedIndex = producten.Count > 0 ? 0 : -1;
+
+            // Aantal default
+            nudAantal.Minimum = 1;
+            nudAantal.Maximum = 1000000;
+            nudAantal.Value = 1;
+        }
+
+        private void LoadLeveringen()
+        {
+            lvLeveringen.Items.Clear();
+
+            List<LeveringModel> leveringen = leveringController.GetAll();
+
+            foreach (var l in leveringen)
+            {
+                var item = new ListViewItem(l.LeveringId.ToString());
+                item.SubItems.Add(l.LeverDatum.ToShortDateString());
+                item.SubItems.Add(l.LeverancierNaam);
+                item.SubItems.Add(l.ProductNaam);
+                item.SubItems.Add(l.Aantal.ToString());
+                item.SubItems.Add(l.Notitie ?? "");
+
+                lvLeveringen.Items.Add(item);
+            }
+        }
+
+        private void btnOpslaanLevering_Click(object sender, EventArgs e)
+        {
+            if (cbLeverancier.SelectedItem == null || cbProduct.SelectedItem == null)
+            {
+                MessageBox.Show("Kies een leverancier en een product.");
+                return;
+            }
+
+            var leverancierId = (int)cbLeverancier.SelectedValue;
+            var productId = (int)cbProduct.SelectedValue;
+
+            var levering = new LeveringModel
+            {
+                LeverancierId = leverancierId,
+                ProductId = productId,
+                Aantal = (int)nudAantal.Value,
+                LeverDatum = dtpLeverDatum.Value.Date,
+                Notitie = txtNotitie != null ? txtNotitie.Text.Trim() : ""
+            };
+
+            bool success = leveringController.Add(levering);
+
+            if (success)
+            {
+                MessageBox.Show("Levering opgeslagen!");
+                LoadLeveringen();
+            }
+            else
+            {
+                MessageBox.Show("Opslaan mislukt.");
+            }
+        }
+
+        // ===== Navigatie links =====
+        private void btnProducten_Click(object sender, EventArgs e)
+        {
+            new frmProduct().Show();
+            this.Hide();
+        }
+
+        private void btnLeveranciers_Click(object sender, EventArgs e)
+        {
+            new frmLeveranciers().Show();
+            this.Hide();
+        }
+
+        private void btnLeveringen_Click(object sender, EventArgs e)
+        {
+            // je zit hier al
+            LoadLeveringen();
+        }
+
+        private void btnGrafiek_Click(object sender, EventArgs e)
+        {
+            new frmGrafiek().Show();
+            this.Hide();
+        }
+    }
+}
