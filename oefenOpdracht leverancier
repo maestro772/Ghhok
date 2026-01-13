@@ -1,0 +1,514 @@
+namespace Leverancier.Model
+{
+    public class LeverancierModel
+    {
+        public int LeverancierId { get; set; }                 // INT IDENTITY
+        public string LeverancierNaam { get; set; }            // VARCHAR(150)
+        public string ContactNaam { get; set; }                // VARCHAR(150)
+        public string TelefoonnummerLeverancier { get; set; }  // VARCHAR(30)
+        public string EmailLeverancier { get; set; }           // VARCHAR(150)
+        public string Plaats { get; set; }                     // VARCHAR(100)
+        public bool Actief { get; set; }                       // BIT
+    }
+}
+
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+LeverancierController.cs (CRUD op SQL tabel Leverancier)
+
+frmLeveranciers.cs (overzicht: ListView vullen + nav links + Toevoegen/Bewerken/Verwijderen)
+
+frmLeverancierToevoegen.cs (opent bij toevoegen)
+
+frmLeverancierBewerken.cs (opent bij bewerken met geselecteerde leverancier)
+
+Model blijft EXACT zoals jij hem stuurde (namespace Voedselbank.Model).
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+1) LeverancierController.cs
+
+
+
+
+Ik ga uit van SQL tabelnaam: Leverancier met kolommen:
+LeverancierId, LeverancierNaam, ContactNaam, TelefoonnummerLeverancier, EmailLeverancier, Plaats, Actief
+Als jouw tabel anders heet (bv Leveranciers) → vervang alleen die naam in de query’s.
+
+using System;
+using System.Collections.Generic;
+using System.Data.SqlClient;
+using Voedselbank.Model;
+
+namespace Voedselbank.Controllers
+{
+    public class LeverancierController
+    {
+        private readonly string _connectionString;
+
+        public LeverancierController(string connectionString)
+        {
+            _connectionString = connectionString;
+        }
+
+        public List<LeverancierModel> GetAll()
+        {
+            var leveranciers = new List<LeverancierModel>();
+
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            using (SqlCommand cmd = new SqlCommand(@"
+                SELECT LeverancierId, LeverancierNaam, ContactNaam, TelefoonnummerLeverancier, EmailLeverancier, Plaats, Actief
+                FROM Leverancier
+                ORDER BY LeverancierNaam", conn))
+            {
+                conn.Open();
+                using (SqlDataReader reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        leveranciers.Add(new LeverancierModel
+                        {
+                            LeverancierId = Convert.ToInt32(reader["LeverancierId"]),
+                            LeverancierNaam = reader["LeverancierNaam"].ToString(),
+                            ContactNaam = reader["ContactNaam"].ToString(),
+                            TelefoonnummerLeverancier = reader["TelefoonnummerLeverancier"].ToString(),
+                            EmailLeverancier = reader["EmailLeverancier"].ToString(),
+                            Plaats = reader["Plaats"].ToString(),
+                            Actief = Convert.ToBoolean(reader["Actief"])
+                        });
+                    }
+                }
+            }
+
+            return leveranciers;
+        }
+
+        public int Add(LeverancierModel leverancier)
+        {
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            using (SqlCommand cmd = new SqlCommand(@"
+                INSERT INTO Leverancier (LeverancierNaam, ContactNaam, TelefoonnummerLeverancier, EmailLeverancier, Plaats, Actief)
+                VALUES (@LeverancierNaam, @ContactNaam, @TelefoonnummerLeverancier, @EmailLeverancier, @Plaats, @Actief);
+                SELECT SCOPE_IDENTITY();", conn))
+            {
+                cmd.Parameters.AddWithValue("@LeverancierNaam", leverancier.LeverancierNaam);
+                cmd.Parameters.AddWithValue("@ContactNaam", leverancier.ContactNaam);
+                cmd.Parameters.AddWithValue("@TelefoonnummerLeverancier", leverancier.TelefoonnummerLeverancier);
+                cmd.Parameters.AddWithValue("@EmailLeverancier", leverancier.EmailLeverancier);
+                cmd.Parameters.AddWithValue("@Plaats", leverancier.Plaats);
+                cmd.Parameters.AddWithValue("@Actief", leverancier.Actief);
+
+                conn.Open();
+                return Convert.ToInt32(cmd.ExecuteScalar());
+            }
+        }
+
+        public bool Update(LeverancierModel leverancier)
+        {
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            using (SqlCommand cmd = new SqlCommand(@"
+                UPDATE Leverancier
+                SET LeverancierNaam = @LeverancierNaam,
+                    ContactNaam = @ContactNaam,
+                    TelefoonnummerLeverancier = @TelefoonnummerLeverancier,
+                    EmailLeverancier = @EmailLeverancier,
+                    Plaats = @Plaats,
+                    Actief = @Actief
+                WHERE LeverancierId = @LeverancierId", conn))
+            {
+                cmd.Parameters.AddWithValue("@LeverancierId", leverancier.LeverancierId);
+                cmd.Parameters.AddWithValue("@LeverancierNaam", leverancier.LeverancierNaam);
+                cmd.Parameters.AddWithValue("@ContactNaam", leverancier.ContactNaam);
+                cmd.Parameters.AddWithValue("@TelefoonnummerLeverancier", leverancier.TelefoonnummerLeverancier);
+                cmd.Parameters.AddWithValue("@EmailLeverancier", leverancier.EmailLeverancier);
+                cmd.Parameters.AddWithValue("@Plaats", leverancier.Plaats);
+                cmd.Parameters.AddWithValue("@Actief", leverancier.Actief);
+
+                conn.Open();
+                return cmd.ExecuteNonQuery() > 0;
+            }
+        }
+
+        public bool Delete(int leverancierId)
+        {
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            using (SqlCommand cmd = new SqlCommand(@"
+                DELETE FROM Leverancier
+                WHERE LeverancierId = @LeverancierId", conn))
+            {
+                cmd.Parameters.AddWithValue("@LeverancierId", leverancierId);
+
+                conn.Open();
+                return cmd.ExecuteNonQuery() > 0;
+            }
+        }
+    }
+}
+
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+2) frmLeveranciers.cs (Overzicht)
+
+Naamgeving (zoals jij wilt):
+
+ListView: lvLeveranciers
+
+Knoppen onderaan:
+
+btnLeverancierToevoegen
+
+btnLeverancierBewerken
+
+btnLeverancierVerwijderen
+
+Links navigatie (zelfde als schets):
+
+btnProducten
+
+btnLeveranciers
+
+btnLeveringen
+
+btnGrafiek
+
+using System;
+using System.Collections.Generic;
+using System.Configuration;
+using System.Windows.Forms;
+using Voedselbank.Controllers;
+using Voedselbank.Model;
+
+namespace Voedselbankk.View
+{
+    public partial class frmLeveranciers : Form
+    {
+        private LeverancierController leverancierController;
+
+        public frmLeveranciers()
+        {
+            InitializeComponent();
+
+            string connStr = ConfigurationManager.ConnectionStrings["VoedselbankDB"].ConnectionString;
+            leverancierController = new LeverancierController(connStr);
+        }
+
+        private void frmLeveranciers_Load(object sender, EventArgs e)
+        {
+            lvLeveranciers.Columns.Clear();
+            lvLeveranciers.Columns.Add("Id", 60);
+            lvLeveranciers.Columns.Add("Leverancier", 180);
+            lvLeveranciers.Columns.Add("Contact", 160);
+            lvLeveranciers.Columns.Add("Telefoon", 120);
+            lvLeveranciers.Columns.Add("Email", 180);
+            lvLeveranciers.Columns.Add("Plaats", 120);
+            lvLeveranciers.Columns.Add("Actief", 60);
+
+            lvLeveranciers.FullRowSelect = true;
+            lvLeveranciers.View = View.Details;
+
+            VulListView();
+        }
+
+        private void VulListView()
+        {
+            lvLeveranciers.Items.Clear();
+
+            List<LeverancierModel> leveranciers = leverancierController.GetAll();
+
+            foreach (LeverancierModel l in leveranciers)
+            {
+                ListViewItem item = new ListViewItem(l.LeverancierId.ToString());
+                item.SubItems.Add(l.LeverancierNaam);
+                item.SubItems.Add(l.ContactNaam);
+                item.SubItems.Add(l.TelefoonnummerLeverancier);
+                item.SubItems.Add(l.EmailLeverancier);
+                item.SubItems.Add(l.Plaats);
+                item.SubItems.Add(l.Actief ? "Ja" : "Nee");
+
+                item.Tag = l;
+                lvLeveranciers.Items.Add(item);
+            }
+        }
+
+        private void btnLeverancierToevoegen_Click(object sender, EventArgs e)
+        {
+            frmLeverancierToevoegen f = new frmLeverancierToevoegen(leverancierController);
+            f.ShowDialog();
+            VulListView();
+        }
+
+        private void btnLeverancierBewerken_Click(object sender, EventArgs e)
+        {
+            if (lvLeveranciers.SelectedItems.Count == 0)
+            {
+                MessageBox.Show("Selecteer eerst een leverancier om te bewerken.");
+                return;
+            }
+
+            var selectedItem = lvLeveranciers.SelectedItems[0];
+            var leverancier = selectedItem.Tag as LeverancierModel;
+
+            if (leverancier == null)
+            {
+                MessageBox.Show("Ongeldige leverancier geselecteerd.");
+                return;
+            }
+
+            frmLeverancierBewerken bewerkenForm = new frmLeverancierBewerken(leverancierController, leverancier);
+            bewerkenForm.ShowDialog();
+            VulListView();
+        }
+
+        private void btnLeverancierVerwijderen_Click(object sender, EventArgs e)
+        {
+            if (lvLeveranciers.SelectedItems.Count == 0)
+            {
+                MessageBox.Show("Selecteer eerst een leverancier.");
+                return;
+            }
+
+            var selectedItem = lvLeveranciers.SelectedItems[0];
+            var leverancier = selectedItem.Tag as LeverancierModel;
+
+            if (leverancier == null)
+            {
+                MessageBox.Show("Ongeldige leverancier geselecteerd.");
+                return;
+            }
+
+            var confirm = MessageBox.Show(
+                $"Weet je zeker dat je '{leverancier.LeverancierNaam}' wilt verwijderen?",
+                "Bevestig verwijdering",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning
+            );
+
+            if (confirm == DialogResult.Yes)
+            {
+                bool success = leverancierController.Delete(leverancier.LeverancierId);
+
+                if (success)
+                {
+                    MessageBox.Show("Leverancier succesvol verwijderd.");
+                    VulListView();
+                }
+                else
+                {
+                    MessageBox.Show("Verwijderen mislukt.");
+                }
+            }
+        }
+
+        // ===== Navigatie links =====
+        private void btnProducten_Click(object sender, EventArgs e)
+        {
+            frmProduct f = new frmProduct();
+            f.Show();
+            this.Hide();
+        }
+
+        private void btnLeveranciers_Click(object sender, EventArgs e)
+        {
+            // je zit hier al
+            VulListView();
+        }
+
+        private void btnLeveringen_Click(object sender, EventArgs e)
+        {
+            frmLevering f = new frmLevering(); // pas aan als jouw form anders heet
+            f.Show();
+            this.Hide();
+        }
+
+        private void btnGrafiek_Click(object sender, EventArgs e)
+        {
+            frmGrafiek f = new frmGrafiek();
+            f.Show();
+            this.Hide();
+        }
+    }
+}
+
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+3) frmLeverancierToevoegen.cs
+
+Controls die je op deze form zet (naamgeving):
+
+txtLeverancierNaam
+
+txtContactNaam
+
+txtTelefoon
+
+txtEmail
+
+txtPlaats
+
+chkActief
+
+Buttons: btnOpslaan, btnAnnuleren
+
+using System;
+using System.Windows.Forms;
+using Voedselbank.Controllers;
+using Voedselbank.Model;
+
+namespace Voedselbankk.View
+{
+    public partial class frmLeverancierToevoegen : Form
+    {
+        private LeverancierController leverancierController;
+
+        public frmLeverancierToevoegen(LeverancierController controller)
+        {
+            InitializeComponent();
+            leverancierController = controller;
+        }
+
+        private void btnOpslaan_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                LeverancierModel l = new LeverancierModel
+                {
+                    LeverancierNaam = txtLeverancierNaam.Text.Trim(),
+                    ContactNaam = txtContactNaam.Text.Trim(),
+                    TelefoonnummerLeverancier = txtTelefoon.Text.Trim(),
+                    EmailLeverancier = txtEmail.Text.Trim(),
+                    Plaats = txtPlaats.Text.Trim(),
+                    Actief = chkActief.Checked
+                };
+
+                if (string.IsNullOrWhiteSpace(l.LeverancierNaam))
+                {
+                    MessageBox.Show("Leveranciernaam is verplicht.");
+                    return;
+                }
+
+                int newId = leverancierController.Add(l);
+
+                if (newId > 0)
+                {
+                    MessageBox.Show("Leverancier toegevoegd!");
+                    this.Close();
+                }
+                else
+                {
+                    MessageBox.Show("Toevoegen mislukt.");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Fout bij toevoegen: " + ex.Message);
+            }
+        }
+
+        private void btnAnnuleren_Click(object sender, EventArgs e)
+        {
+            this.Close();
+        }
+    }
+}
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+4) frmLeverancierBewerken.cs
+
+Zelfde controls als Toevoegen.
+
+using System;
+using System.Windows.Forms;
+using Voedselbank.Controllers;
+using Voedselbank.Model;
+
+namespace Voedselbankk.View
+{
+    public partial class frmLeverancierBewerken : Form
+    {
+        private LeverancierController leverancierController;
+        private LeverancierModel leverancier;
+
+        public frmLeverancierBewerken(LeverancierController controller, LeverancierModel selectedLeverancier)
+        {
+            InitializeComponent();
+
+            leverancierController = controller;
+
+            // kopie zodat cancel geen rare dingen doet
+            leverancier = new LeverancierModel
+            {
+                LeverancierId = selectedLeverancier.LeverancierId,
+                LeverancierNaam = selectedLeverancier.LeverancierNaam,
+                ContactNaam = selectedLeverancier.ContactNaam,
+                TelefoonnummerLeverancier = selectedLeverancier.TelefoonnummerLeverancier,
+                EmailLeverancier = selectedLeverancier.EmailLeverancier,
+                Plaats = selectedLeverancier.Plaats,
+                Actief = selectedLeverancier.Actief
+            };
+
+            txtLeverancierNaam.Text = leverancier.LeverancierNaam;
+            txtContactNaam.Text = leverancier.ContactNaam;
+            txtTelefoon.Text = leverancier.TelefoonnummerLeverancier;
+            txtEmail.Text = leverancier.EmailLeverancier;
+            txtPlaats.Text = leverancier.Plaats;
+            chkActief.Checked = leverancier.Actief;
+        }
+
+        private void btnOpslaan_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                leverancier.LeverancierNaam = txtLeverancierNaam.Text.Trim();
+                leverancier.ContactNaam = txtContactNaam.Text.Trim();
+                leverancier.TelefoonnummerLeverancier = txtTelefoon.Text.Trim();
+                leverancier.EmailLeverancier = txtEmail.Text.Trim();
+                leverancier.Plaats = txtPlaats.Text.Trim();
+                leverancier.Actief = chkActief.Checked;
+
+                if (string.IsNullOrWhiteSpace(leverancier.LeverancierNaam))
+                {
+                    MessageBox.Show("Leveranciernaam is verplicht.");
+                    return;
+                }
+
+                bool success = leverancierController.Update(leverancier);
+
+                if (success)
+                {
+                    MessageBox.Show("Leverancier bijgewerkt!");
+                    this.Close();
+                }
+                else
+                {
+                    MessageBox.Show("Bewerken mislukt.");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Fout bij bewerken: " + ex.Message);
+            }
+        }
+
+        private void btnAnnuleren_Click(object sender, EventArgs e)
+        {
+            this.Close();
+        }
+    }
+}
+
+Belangrijk (zodat het in 1x werkt)
+
+ListView op overzicht moet heten: lvLeveranciers
+
+Knoppen: btnLeverancierToevoegen / btnLeverancierBewerken / btnLeverancierVerwijderen
+
+Navigatie-knoppen links: btnProducten / btnLeveranciers / btnLeveringen / btnGrafiek
+
+Toevoegen/Bewerken forms moeten de textbox-namen matchen zoals hierboven.
+
+Als jij al andere controlnamen hebt (bijv. txtNaam i.p.v. txtLeverancierNaam), drop die namen hier — dan pas ik de code 1-op-1 aan zodat je niks hoeft te renamen.
