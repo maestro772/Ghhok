@@ -1,0 +1,67 @@
+/* =========================
+   UNIQUE CONSTRAINTS (jij had deze al)
+   ========================= */
+
+ALTER TABLE Categorie
+ADD CONSTRAINT AK_Categorie_CategorieNaam
+UNIQUE (CategorieNaam);
+
+ALTER TABLE Leverancier
+ADD CONSTRAINT AK_Leverancier_LeverancierNaam
+UNIQUE (LeverancierNaam);
+
+-- Zelfde productnaam mag niet dubbel bij dezelfde leverancier
+ALTER TABLE [Product]
+ADD CONSTRAINT AK_Product_ProductNaam_LeverancierId
+UNIQUE (ProductNaam, LeverancierId);
+
+
+/* =========================
+   PRIMARY KEYS (aanrader / vaak verplicht)
+   ========================= */
+
+ALTER TABLE Categorie
+ADD CONSTRAINT PK_Categorie PRIMARY KEY (CategorieId);
+
+ALTER TABLE Leverancier
+ADD CONSTRAINT PK_Leverancier PRIMARY KEY (LeverancierId);
+
+ALTER TABLE [Product]
+ADD CONSTRAINT PK_Product PRIMARY KEY (ProductId);
+
+ALTER TABLE Levering
+ADD CONSTRAINT PK_Levering PRIMARY KEY (LeveringId);
+
+-- Koppeltabel PK (combi)
+ALTER TABLE LeveringProduct
+ADD CONSTRAINT PK_LeveringProduct PRIMARY KEY (LeveringId, ProductId);
+
+
+/* =========================
+   FOREIGN KEYS (dit mis je voor relaties)
+   ========================= */
+
+-- Product -> Categorie
+ALTER TABLE [Product]
+ADD CONSTRAINT FK_Product_Categorie
+FOREIGN KEY (CategorieId) REFERENCES Categorie(CategorieId);
+
+-- Product -> Leverancier
+ALTER TABLE [Product]
+ADD CONSTRAINT FK_Product_Leverancier
+FOREIGN KEY (LeverancierId) REFERENCES Leverancier(LeverancierId);
+
+-- Levering -> Leverancier
+ALTER TABLE Levering
+ADD CONSTRAINT FK_Levering_Leverancier
+FOREIGN KEY (LeverancierId) REFERENCES Leverancier(LeverancierId);
+
+-- LeveringProduct -> Levering
+ALTER TABLE LeveringProduct
+ADD CONSTRAINT FK_LeveringProduct_Levering
+FOREIGN KEY (LeveringId) REFERENCES Levering(LeveringId);
+
+-- LeveringProduct -> Product
+ALTER TABLE LeveringProduct
+ADD CONSTRAINT FK_LeveringProduct_Product
+FOREIGN KEY (ProductId) REFERENCES [Product](ProductId);
