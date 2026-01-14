@@ -1,0 +1,599 @@
+Create
+
+public bool CreateProduct(ProductModel product)
+{
+    try
+    {
+        using (SqlConnection con = new SqlConnection(connectionString))
+        {
+            string sqlQuery = @"
+                INSERT INTO Product (ProductNaam, PortiesPerEenheid, Voorraad, Actief, CategorieId, LeverancierId)
+                VALUES (@ProductNaam, @PortiesPerEenheid, @Voorraad, @Actief, @CategorieId, @LeverancierId)";
+
+            using (SqlCommand cmd = new SqlCommand(sqlQuery, con))
+            {
+                cmd.Parameters.AddWithValue("@ProductNaam", product.ProductNaam);
+                cmd.Parameters.AddWithValue("@PortiesPerEenheid", product.PortiesPerEenheid);
+                cmd.Parameters.AddWithValue("@Voorraad", product.Voorraad);
+                cmd.Parameters.AddWithValue("@Actief", product.Actief);
+                cmd.Parameters.AddWithValue("@CategorieId", product.CategorieId);
+                cmd.Parameters.AddWithValue("@LeverancierId", product.LeverancierId);
+
+                con.Open();
+                int rowsAffected = cmd.ExecuteNonQuery();
+                return rowsAffected > 0;
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show("Fout bij toevoegen van product: " + ex.Message);
+        return false;
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Create uitleg 
+
+
+
+
+
+Als jij in je controller nu ReadAll() (of ReadAll) gebruikt, dan moet je in je andere bestanden alleen deze dingen aanpassen:
+
+1) In je Overzicht-form (frmProduct)
+A) VulListView moet ReadAll() aanroepen (niet GetAll())
+
+Voorbeeld:
+
+List<ProductModel> producten = productController.ReadAll();
+
+B) Elke rij die je in de ListView zet moet Tag = product krijgen
+item.Tag = product;
+
+
+Zodat je later bij bewerken/verwijderen het hele object terug kunt pakken.
+
+2) Bij Verwijderen-knop
+
+Je pakt het geselecteerde product uit de Tag en roept delete aan.
+
+var product = lvProducten.SelectedItems[0].Tag as ProductModel;
+bool success = productController.DeleteProduct(product.ProductId);
+if (success) VulListView();
+
+
+Let op: als jouw delete-methode anders heet (Delete i.p.v. DeleteProduct) dan pas je die naam aan.
+
+3) Bij Toevoegen-form (frmProductToevoegen)
+
+Als jij een insert methode hebt zoals CreateProduct(product) dan moet je dit doen:
+
+bool success = productController.CreateProduct(product);
+if (success) this.Close();
+
+
+(Als jouw methode Add(product) heet, dan gebruik je Add.)
+
+4) Bij Bewerken-form (frmProductBewerken)
+
+Als jij update methode heet UpdateProduct(product) dan:
+
+bool success = productController.UpdateProduct(product);
+if (success) this.Close();
+
+Super belangrijk: Consistent blijven met methodenamen
+
+Je moet kiezen welke namen je gebruikt, en dan in je forms dezelfde.
+
+Als jouw controller zo heet:
+
+ReadAll()
+
+CreateProduct()
+
+UpdateProduct()
+
+DeleteProduct()
+
+Dan moeten je forms ook precies dat aanroepen.
+
+Mini-check: welke methode namen heb jij nu echt?
+
+In je controller: heet het nu ReadAll() of GetAll()?
+En heet delete Delete() of DeleteProduct()?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+✅ DeleteProduct (zoals DeleteSpeler)
+
+
+public bool DeleteProduct(int productId)
+{
+    try
+    {
+        using (var con = new SqlConnection(connectionString))
+        {
+            string deleteQuery = "DELETE FROM Product WHERE ProductId = @ProductId";
+
+            using (var cmd = new SqlCommand(deleteQuery, con))
+            {
+                cmd.Parameters.AddWithValue("@ProductId", productId);
+
+                con.Open();
+                int rowsAffected = cmd.ExecuteNonQuery();
+                return rowsAffected > 0;
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show("Fout bij verwijderen van product: " + ex.Message);
+        return false;
+    }
+}    
+
+
+
+
+
+
+
+
+
+
+
+
+Uitleg delete
+
+
+
+
+
+Top — als je nu DeleteProduct(int productId) in je ProductController hebt gezet, dan moet je dit op 2 plekken goed zetten:
+
+1) ProductController.cs
+
+Zorg dat deze methode erin staat:
+
+public bool DeleteProduct(int productId)
+
+
+✅ klaar.
+
+2) frmProduct.cs (de knop btnVerwijderen)
+
+In jouw btnVerwijderen_Click moet je:
+
+checken of er iets geselecteerd is
+
+ProductModel uit Tag halen
+
+DeleteProduct(product.ProductId) aanroepen
+
+ListView refreshen (VulListView())
+
+Plak dit in btnVerwijderen_Click:
+
+private void btnVerwijderen_Click(object sender, EventArgs e)
+{
+    if (lvProducten.SelectedItems.Count == 0)
+    {
+        MessageBox.Show("Selecteer eerst een product.");
+        return;
+    }
+
+    var selectedItem = lvProducten.SelectedItems[0];
+    var product = selectedItem.Tag as ProductModel;
+
+    if (product == null)
+    {
+        MessageBox.Show("Ongeldig product geselecteerd.");
+        return;
+    }
+
+    var confirm = MessageBox.Show(
+        $"Weet je zeker dat je '{product.ProductNaam}' wilt verwijderen?",
+        "Bevestig verwijdering",
+        MessageBoxButtons.YesNo,
+        MessageBoxIcon.Warning
+    );
+
+    if (confirm == DialogResult.Yes)
+    {
+        bool success = productController.DeleteProduct(product.ProductId);
+
+        if (success)
+        {
+            MessageBox.Show("Product verwijderd!");
+            VulListView(); // ✅ refresh
+        }
+        else
+        {
+            MessageBox.Show("Verwijderen mislukt.");
+        }
+    }
+}
+
+
+Belangrijk: bovenaan frmProduct.cs moet je hebben:
+
+using Voedselbank.Models;
+
+3) VulListView() moet Tag zetten (anders werkt delete niet)
+
+In jouw VulListView() moet deze regel erin zitten:
+
+item.Tag = product;
+
+
+Zonder die regel kan je later geen ProductModel terugpakken uit de selectie.
+
+Welke bestanden hoef je NIET te veranderen?
+
+frmProductToevoegen → hoeft niks voor delete
+
+frmProductBewerken → hoeft niks voor delete
+
+database → hoeft niks te veranderen (behalve dat FK’s delete kunnen blokkeren)
+
+
+
+
+
+
+
+
+Update
+
+
+
+
+✅ UpdateProduct (zoals UpdateSpeler)
+public bool UpdateProduct(ProductModel product)
+{
+    try
+    {
+        using (var con = new SqlConnection(connectionString))
+        {
+            string query = @"
+                UPDATE Product
+                SET ProductNaam = @ProductNaam,
+                    PortiesPerEenheid = @PortiesPerEenheid,
+                    Voorraad = @Voorraad,
+                    Actief = @Actief,
+                    CategorieId = @CategorieId,
+                    LeverancierId = @LeverancierId
+                WHERE ProductId = @ProductId";
+
+            using (var cmd = new SqlCommand(query, con))
+            {
+                cmd.Parameters.AddWithValue("@ProductNaam", product.ProductNaam);
+                cmd.Parameters.AddWithValue("@PortiesPerEenheid", product.PortiesPerEenheid);
+                cmd.Parameters.AddWithValue("@Voorraad", product.Voorraad);
+                cmd.Parameters.AddWithValue("@Actief", product.Actief);
+                cmd.Parameters.AddWithValue("@CategorieId", product.CategorieId);
+                cmd.Parameters.AddWithValue("@LeverancierId", product.LeverancierId);
+                cmd.Parameters.AddWithValue("@ProductId", product.ProductId);
+
+                con.Open();
+                int rowsAffected = cmd.ExecuteNonQuery();
+                return rowsAffected > 0;
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show("Fout bij updaten van product: " + ex.Message);
+        return false;
+    }
+}
+
+Kleine check (zodat hij meteen werkt)
+
+In jouw controller moet bovenaan staan:
+
+using System.Data.SqlClient;
+using System.Windows.Forms;
+
+
+En je veldnaam moet kloppen:
+
+als jij private string conString = @"..." hebt, vervang connectionString door conString in de methodes.
+
+
+
+
+
+
+
+
+
+Update uitleg
+
+
+Top — voor Update moet je in 3 bestanden iets goed zetten:
+
+ProductController.cs → methode UpdateProduct(ProductModel product) (die heb je al)
+
+frmProduct.cs → bij btnBewerken_Click moet je het geselecteerde product meegeven naar frmProductBewerken
+
+frmProductBewerken.cs → bij opslaan moet je UpdateProduct(product) aanroepen
+
+Ik zet hieronder exact wat je waar plakt.
+
+1) ProductController.cs
+
+Zorg dat je deze methode hebt:
+
+public bool UpdateProduct(ProductModel product)
+
+
+✅ klaar.
+
+2) frmProduct.cs → btnBewerken_Click
+
+Plak/gebruik dit:
+
+private void btnBewerken_Click(object sender, EventArgs e)
+{
+    if (lvProducten.SelectedItems.Count == 0)
+    {
+        MessageBox.Show("Selecteer eerst een product om te bewerken.");
+        return;
+    }
+
+    var selectedItem = lvProducten.SelectedItems[0];
+    var product = selectedItem.Tag as ProductModel;
+
+    if (product == null)
+    {
+        MessageBox.Show("Ongeldig product geselecteerd.");
+        return;
+    }
+
+    // Open bewerk-form en geef product + controller mee
+    frmProductBewerken f = new frmProductBewerken(productController, product);
+    f.ShowDialog();
+
+    // ✅ na sluiten refresh
+    VulListView();
+}
+
+
+Belangrijk: dit werkt alleen als in VulListView() deze regel staat:
+
+item.Tag = product;
+
+3) frmProductBewerken.cs → btnOpslaan_Click
+
+In dit form gebeurt update echt. Plak dit in btnOpslaan_Click:
+
+private void btnOpslaan_Click(object sender, EventArgs e)
+{
+    try
+    {
+        // waarden uit de controls terug in het object
+        product.ProductNaam = txtNaam.Text.Trim();
+        product.PortiesPerEenheid = (int)nudPorties.Value;
+        product.Voorraad = (int)nudVoorraad.Value;
+        product.Actief = chkActief.Checked;
+        product.CategorieId = (int)nudCategorieId.Value;
+        product.LeverancierId = (int)nudLeverancierId.Value;
+
+        if (string.IsNullOrWhiteSpace(product.ProductNaam))
+        {
+            MessageBox.Show("Productnaam is verplicht.");
+            return;
+        }
+
+        bool success = productController.UpdateProduct(product);
+
+        if (success)
+        {
+            MessageBox.Show("Product bijgewerkt!");
+            this.Close();
+        }
+        else
+        {
+            MessageBox.Show("Bewerken mislukt.");
+        }
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show("Fout bij bewerken: " + ex.Message);
+    }
+}
+
+
+✅ Dit is de enige plek waar UpdateProduct(...) wordt aangeroepen.
+
+Samenvatting (kort)
+
+Controller: UpdateProduct(product) bestaat
+
+frmProduct: opent bewerk-form met geselecteerde product
+
+frmProductBewerken: vult product met input en roept UpdateProduct(product) aan
+
+Na sluiten: VulListView() refresht automatisch
+
+Als je wil, plak je huidige frmProductBewerken.cs (alleen constructor + btnOpslaan) en ik pas het exact aan op jouw controlnamen.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+✅ ReadAll (alle producten ophalen)
+public List<ProductModel> ReadAll()
+{
+    List<ProductModel> producten = new List<ProductModel>();
+
+    try
+    {
+        using (var con = new SqlConnection(connectionString))
+        {
+            string query = @"
+                SELECT ProductId, ProductNaam, PortiesPerEenheid, Voorraad, Actief, CategorieId, LeverancierId
+                FROM Product
+                ORDER BY ProductNaam";
+
+            using (var cmd = new SqlCommand(query, con))
+            {
+                con.Open();
+                using (var reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        producten.Add(new ProductModel
+                        {
+                            ProductId = Convert.ToInt32(reader["ProductId"]),
+                            ProductNaam = reader["ProductNaam"].ToString(),
+                            PortiesPerEenheid = Convert.ToInt32(reader["PortiesPerEenheid"]),
+                            Voorraad = Convert.ToInt32(reader["Voorraad"]),
+                            Actief = Convert.ToBoolean(reader["Actief"]),
+                            CategorieId = Convert.ToInt32(reader["CategorieId"]),
+                            LeverancierId = Convert.ToInt32(reader["LeverancierId"])
+                        });
+                    }
+                }
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show("Fout bij ophalen producten: " + ex.Message);
+    }
+
+    return producten;
+}
+
+✅ ReadByProductId (1 product ophalen op ID)
+public ProductModel ReadByProductId(int productId)
+{
+    ProductModel product = null;
+
+    try
+    {
+        using (var con = new SqlConnection(connectionString))
+        {
+            string query = @"
+                SELECT ProductId, ProductNaam, PortiesPerEenheid, Voorraad, Actief, CategorieId, LeverancierId
+                FROM Product
+                WHERE ProductId = @ProductId";
+
+            using (var cmd = new SqlCommand(query, con))
+            {
+                cmd.Parameters.AddWithValue("@ProductId", productId);
+
+                con.Open();
+                using (var reader = cmd.ExecuteReader())
+                {
+                    if (reader.Read())
+                    {
+                        product = new ProductModel
+                        {
+                            ProductId = Convert.ToInt32(reader["ProductId"]),
+                            ProductNaam = reader["ProductNaam"].ToString(),
+                            PortiesPerEenheid = Convert.ToInt32(reader["PortiesPerEenheid"]),
+                            Voorraad = Convert.ToInt32(reader["Voorraad"]),
+                            Actief = Convert.ToBoolean(reader["Actief"]),
+                            CategorieId = Convert.ToInt32(reader["CategorieId"]),
+                            LeverancierId = Convert.ToInt32(reader["LeverancierId"])
+                        };
+                    }
+                }
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show("Fout bij ophalen product: " + ex.Message);
+    }
+
+    return product;
+}
+
+Waar zet je dit?
+
+In dezelfde class als je andere methodes: ProductController.cs.
+
+Hoe gebruik je ReadAll in je ListView?
+var producten = productController.ReadAll();
+
+Hoe gebruik je ReadByProductId?
+var p = productController.ReadByProductId(5);
+
+
+Als jij wilt, plak jouw CREATE TABLE Product even, dan check ik direct of kolomnamen exact kloppen (meest voorkomende reden dat Read “niet werkt”).
+
+
+
