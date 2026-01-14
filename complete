@@ -1,0 +1,465 @@
+Hieronder krijg je per bestand de nieuwe versie (copy/paste).
+
+Zet in elke controller exact jouw echte connection string, bv:
+
+@"Data Source=.\SQLEXPRESS;Initial Catalog=VoedselbankGeldermalsen;Integrated Security=True";
+
+1) ProductController.cs (CRUD + ReadAll + ReadById)
+using System;
+using System.Collections.Generic;
+using System.Data.SqlClient;
+using System.Windows.Forms;
+using Voedselbank.Models;
+
+namespace Voedselbank.Controllers
+{
+    public class ProductController
+    {
+        private static string connectionString =
+            @"Data Source=.\SQLEXPRESS;Initial Catalog=VoedselbankGeldermalsen;Integrated Security=True";
+
+        public List<ProductModel> ReadAll()
+        {
+            List<ProductModel> producten = new List<ProductModel>();
+
+            try
+            {
+                using (SqlConnection con = new SqlConnection(connectionString))
+                {
+                    string query = @"
+                        SELECT ProductId, ProductNaam, PortiesPerEenheid, Voorraad, Actief, CategorieId, LeverancierId
+                        FROM Product
+                        ORDER BY ProductNaam";
+
+                    using (SqlCommand cmd = new SqlCommand(query, con))
+                    {
+                        con.Open();
+                        using (SqlDataReader reader = cmd.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                producten.Add(new ProductModel
+                                {
+                                    ProductId = Convert.ToInt32(reader["ProductId"]),
+                                    ProductNaam = reader["ProductNaam"].ToString(),
+                                    PortiesPerEenheid = Convert.ToInt32(reader["PortiesPerEenheid"]),
+                                    Voorraad = Convert.ToInt32(reader["Voorraad"]),
+                                    Actief = Convert.ToBoolean(reader["Actief"]),
+                                    CategorieId = Convert.ToInt32(reader["CategorieId"]),
+                                    LeverancierId = Convert.ToInt32(reader["LeverancierId"])
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Fout bij ophalen producten: " + ex.Message);
+            }
+
+            return producten;
+        }
+
+        public ProductModel ReadByProductId(int productId)
+        {
+            ProductModel product = null;
+
+            try
+            {
+                using (SqlConnection con = new SqlConnection(connectionString))
+                {
+                    string query = @"
+                        SELECT ProductId, ProductNaam, PortiesPerEenheid, Voorraad, Actief, CategorieId, LeverancierId
+                        FROM Product
+                        WHERE ProductId = @ProductId";
+
+                    using (SqlCommand cmd = new SqlCommand(query, con))
+                    {
+                        cmd.Parameters.AddWithValue("@ProductId", productId);
+
+                        con.Open();
+                        using (SqlDataReader reader = cmd.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                product = new ProductModel
+                                {
+                                    ProductId = Convert.ToInt32(reader["ProductId"]),
+                                    ProductNaam = reader["ProductNaam"].ToString(),
+                                    PortiesPerEenheid = Convert.ToInt32(reader["PortiesPerEenheid"]),
+                                    Voorraad = Convert.ToInt32(reader["Voorraad"]),
+                                    Actief = Convert.ToBoolean(reader["Actief"]),
+                                    CategorieId = Convert.ToInt32(reader["CategorieId"]),
+                                    LeverancierId = Convert.ToInt32(reader["LeverancierId"])
+                                };
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Fout bij ophalen product: " + ex.Message);
+            }
+
+            return product;
+        }
+
+        public bool CreateProduct(ProductModel product)
+        {
+            try
+            {
+                using (SqlConnection con = new SqlConnection(connectionString))
+                {
+                    string query = @"
+                        INSERT INTO Product (ProductNaam, PortiesPerEenheid, Voorraad, Actief, CategorieId, LeverancierId)
+                        VALUES (@ProductNaam, @PortiesPerEenheid, @Voorraad, @Actief, @CategorieId, @LeverancierId)";
+
+                    using (SqlCommand cmd = new SqlCommand(query, con))
+                    {
+                        cmd.Parameters.AddWithValue("@ProductNaam", product.ProductNaam);
+                        cmd.Parameters.AddWithValue("@PortiesPerEenheid", product.PortiesPerEenheid);
+                        cmd.Parameters.AddWithValue("@Voorraad", product.Voorraad);
+                        cmd.Parameters.AddWithValue("@Actief", product.Actief);
+                        cmd.Parameters.AddWithValue("@CategorieId", product.CategorieId);
+                        cmd.Parameters.AddWithValue("@LeverancierId", product.LeverancierId);
+
+                        con.Open();
+                        int rows = cmd.ExecuteNonQuery();
+                        return rows > 0;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Fout bij toevoegen product: " + ex.Message);
+                return false;
+            }
+        }
+
+        public bool UpdateProduct(ProductModel product)
+        {
+            try
+            {
+                using (SqlConnection con = new SqlConnection(connectionString))
+                {
+                    string query = @"
+                        UPDATE Product
+                        SET ProductNaam = @ProductNaam,
+                            PortiesPerEenheid = @PortiesPerEenheid,
+                            Voorraad = @Voorraad,
+                            Actief = @Actief,
+                            CategorieId = @CategorieId,
+                            LeverancierId = @LeverancierId
+                        WHERE ProductId = @ProductId";
+
+                    using (SqlCommand cmd = new SqlCommand(query, con))
+                    {
+                        cmd.Parameters.AddWithValue("@ProductNaam", product.ProductNaam);
+                        cmd.Parameters.AddWithValue("@PortiesPerEenheid", product.PortiesPerEenheid);
+                        cmd.Parameters.AddWithValue("@Voorraad", product.Voorraad);
+                        cmd.Parameters.AddWithValue("@Actief", product.Actief);
+                        cmd.Parameters.AddWithValue("@CategorieId", product.CategorieId);
+                        cmd.Parameters.AddWithValue("@LeverancierId", product.LeverancierId);
+                        cmd.Parameters.AddWithValue("@ProductId", product.ProductId);
+
+                        con.Open();
+                        int rows = cmd.ExecuteNonQuery();
+                        return rows > 0;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Fout bij updaten product: " + ex.Message);
+                return false;
+            }
+        }
+
+        public bool DeleteProduct(int productId)
+        {
+            try
+            {
+                using (SqlConnection con = new SqlConnection(connectionString))
+                {
+                    string query = "DELETE FROM Product WHERE ProductId = @ProductId";
+
+                    using (SqlCommand cmd = new SqlCommand(query, con))
+                    {
+                        cmd.Parameters.AddWithValue("@ProductId", productId);
+
+                        con.Open();
+                        int rows = cmd.ExecuteNonQuery();
+                        return rows > 0;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Fout bij verwijderen product: " + ex.Message);
+                return false;
+            }
+        }
+    }
+}
+
+2) frmProduct.cs (Overzicht) — aangepast naar jouw controller style
+
+➡️ Geen ConfigurationManager, gewoon new ProductController().
+
+using System;
+using System.Collections.Generic;
+using System.Windows.Forms;
+using Voedselbank.Controllers;
+using Voedselbank.Models;
+
+namespace Voedselbankk.View
+{
+    public partial class frmProduct : Form
+    {
+        private ProductController productController = new ProductController();
+
+        public frmProduct()
+        {
+            InitializeComponent();
+        }
+
+        private void frmProduct_Load(object sender, EventArgs e)
+        {
+            lvProducten.Columns.Clear();
+            lvProducten.Columns.Add("Id", 60);
+            lvProducten.Columns.Add("Naam", 200);
+            lvProducten.Columns.Add("Porties", 70);
+            lvProducten.Columns.Add("Voorraad", 80);
+            lvProducten.Columns.Add("Actief", 60);
+            lvProducten.Columns.Add("Categorie", 80);
+            lvProducten.Columns.Add("Leverancier", 90);
+
+            lvProducten.FullRowSelect = true;
+            lvProducten.View = View.Details;
+
+            VulListView();
+        }
+
+        private void VulListView()
+        {
+            lvProducten.Items.Clear();
+
+            List<ProductModel> producten = productController.ReadAll();
+
+            foreach (ProductModel product in producten)
+            {
+                ListViewItem item = new ListViewItem(product.ProductId.ToString());
+                item.SubItems.Add(product.ProductNaam);
+                item.SubItems.Add(product.PortiesPerEenheid.ToString());
+                item.SubItems.Add(product.Voorraad.ToString());
+                item.SubItems.Add(product.Actief ? "Ja" : "Nee");
+                item.SubItems.Add(product.CategorieId.ToString());
+                item.SubItems.Add(product.LeverancierId.ToString());
+                item.Tag = product;
+
+                lvProducten.Items.Add(item);
+            }
+        }
+
+        private void btnToevoegen_Click(object sender, EventArgs e)
+        {
+            frmProductToevoegen form = new frmProductToevoegen(productController);
+            form.ShowDialog();
+            VulListView();
+        }
+
+        private void btnBewerken_Click(object sender, EventArgs e)
+        {
+            if (lvProducten.SelectedItems.Count == 0)
+            {
+                MessageBox.Show("Selecteer eerst een product om te bewerken.");
+                return;
+            }
+
+            var product = lvProducten.SelectedItems[0].Tag as ProductModel;
+            if (product == null) return;
+
+            frmProductBewerken form = new frmProductBewerken(productController, product);
+            form.ShowDialog();
+            VulListView();
+        }
+
+        private void btnVerwijderen_Click(object sender, EventArgs e)
+        {
+            if (lvProducten.SelectedItems.Count == 0)
+            {
+                MessageBox.Show("Selecteer eerst een product.");
+                return;
+            }
+
+            var product = lvProducten.SelectedItems[0].Tag as ProductModel;
+            if (product == null) return;
+
+            var confirm = MessageBox.Show(
+                $"Weet je zeker dat je '{product.ProductNaam}' wilt verwijderen?",
+                "Bevestigen",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning);
+
+            if (confirm == DialogResult.Yes)
+            {
+                bool success = productController.DeleteProduct(product.ProductId);
+                if (success) VulListView();
+                else MessageBox.Show("Verwijderen mislukt.");
+            }
+        }
+
+        private void btnProducten_Click(object sender, EventArgs e) => VulListView();
+
+        private void btnLeveranciers_Click(object sender, EventArgs e)
+        {
+            new frmLeveranciers().Show();
+            this.Hide();
+        }
+
+        private void btnLeveringen_Click(object sender, EventArgs e)
+        {
+            new frmLevering().Show();
+            this.Hide();
+        }
+
+        private void btnGrafiek_Click(object sender, EventArgs e)
+        {
+            new frmGrafiek().Show();
+            this.Hide();
+        }
+
+        private void lvProducten_SelectedIndexChanged(object sender, EventArgs e) { }
+        private void btnFilter_Click(object sender, EventArgs e) { }
+    }
+}
+
+3) frmProductToevoegen.cs — aangepast naar CreateProduct
+using System;
+using System.Windows.Forms;
+using Voedselbank.Controllers;
+using Voedselbank.Models;
+
+namespace Voedselbankk.View
+{
+    public partial class frmProductToevoegen : Form
+    {
+        private ProductController productController;
+
+        public frmProductToevoegen(ProductController controller)
+        {
+            InitializeComponent();
+            productController = controller;
+        }
+
+        private void btnOpslaan_Click(object sender, EventArgs e)
+        {
+            ProductModel product = new ProductModel
+            {
+                ProductNaam = txtNaam.Text.Trim(),
+                PortiesPerEenheid = (int)nudPorties.Value,
+                Voorraad = (int)nudVoorraad.Value,
+                Actief = chkActief.Checked,
+                CategorieId = (int)nudCategorieId.Value,
+                LeverancierId = (int)nudLeverancierId.Value
+            };
+
+            if (string.IsNullOrWhiteSpace(product.ProductNaam))
+            {
+                MessageBox.Show("Productnaam is verplicht.");
+                return;
+            }
+
+            bool success = productController.CreateProduct(product);
+
+            if (success)
+            {
+                MessageBox.Show("Product toegevoegd!");
+                Close();
+            }
+            else
+            {
+                MessageBox.Show("Toevoegen mislukt.");
+            }
+        }
+
+        private void btnAnnuleren_Click(object sender, EventArgs e)
+        {
+            Close();
+        }
+    }
+}
+
+4) frmProductBewerken.cs — aangepast naar UpdateProduct
+using System;
+using System.Windows.Forms;
+using Voedselbank.Controllers;
+using Voedselbank.Models;
+
+namespace Voedselbankk.View
+{
+    public partial class frmProductBewerken : Form
+    {
+        private ProductController productController;
+        private ProductModel product;
+
+        public frmProductBewerken(ProductController controller, ProductModel selectedProduct)
+        {
+            InitializeComponent();
+            productController = controller;
+            product = selectedProduct;
+
+            txtNaam.Text = product.ProductNaam;
+            nudPorties.Value = product.PortiesPerEenheid;
+            nudVoorraad.Value = product.Voorraad;
+            chkActief.Checked = product.Actief;
+            nudCategorieId.Value = product.CategorieId;
+            nudLeverancierId.Value = product.LeverancierId;
+        }
+
+        private void btnOpslaan_Click(object sender, EventArgs e)
+        {
+            product.ProductNaam = txtNaam.Text.Trim();
+            product.PortiesPerEenheid = (int)nudPorties.Value;
+            product.Voorraad = (int)nudVoorraad.Value;
+            product.Actief = chkActief.Checked;
+            product.CategorieId = (int)nudCategorieId.Value;
+            product.LeverancierId = (int)nudLeverancierId.Value;
+
+            if (string.IsNullOrWhiteSpace(product.ProductNaam))
+            {
+                MessageBox.Show("Productnaam is verplicht.");
+                return;
+            }
+
+            bool success = productController.UpdateProduct(product);
+
+            if (success)
+            {
+                MessageBox.Show("Product bijgewerkt!");
+                Close();
+            }
+            else
+            {
+                MessageBox.Show("Bewerken mislukt.");
+            }
+        }
+
+        private void btnAnnuleren_Click(object sender, EventArgs e)
+        {
+            Close();
+        }
+    }
+}
+
+Belangrijk: dit moet je nu overal doen (zelfde patroon)
+
+Voor LeverancierController / LeveringController / GrafiekController / CategorieController geldt exact hetzelfde:
+
+connection string static in de controller
+
+forms doen new Controller() en niet meer new Controller(connStr)
+
+Als je wilt, plak je LeverancierController.cs die je nu hebt (of zeg “doe dit ook voor leveranciers/levering/grafiek”), dan zet ik die ook meteen 1-op-1 om naar jouw style (zonder constructors) net zoals hierboven.
